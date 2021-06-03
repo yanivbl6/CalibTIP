@@ -237,7 +237,7 @@ def main_worker(args):
     time_stamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     if args.evaluate:
         args.results_dir = '/tmp'
-    if args.save is '':
+    if args.save == '':
         args.save = time_stamp
     save_path = os.path.join(args.results_dir, args.save)
 
@@ -393,11 +393,20 @@ def main_worker(args):
                 {'epoch': 0, 'optimizer': 'SGD', 'lr': 1e-1},
                 {'epoch': 10, 'lr': 1e-2},
                 {'epoch': 15, 'lr': 1e-3}]
+            epochs = 20
+
         else:              
             optim_regime = [
                 {'epoch': 0, 'optimizer': 'SGD', 'lr': 1e-4, 'momentum': 0.9},
                 {'epoch': 2, 'lr': 1e-5, 'momentum': 0.9},
                 {'epoch': 10, 'lr': 1e-6, 'momentum': 0.9}]
+            epochs = 15
+
+        optim_regime = [
+            {'epoch': 0, 'optimizer': 'SGD', 'lr': 1e-5, 'momentum': 0.9},
+            {'epoch': 2, 'lr': 5e-6, 'momentum': 0.9},
+            {'epoch': 10, 'lr': 1e-6, 'momentum': 0.9}]
+    
     optimizer = optim_regime if isinstance(optim_regime, OptimRegime) \
         else OptimRegime(model, optim_regime, use_float_copy='half' in args.dtype)
 
@@ -454,7 +463,19 @@ def main_worker(args):
         save_results(args.evaluate, val_results, args.evaluate.split("/")[-1] )
 
 
-    if args.adaquant:
+    if args.fine_tune:
+        
+        for epoch in range(epochs):
+            trainer.train(train_data.get_loader())
+
+        filename = args.evaluate + '.finetune'
+        torch.save(model.state_dict(), filename)
+
+        val_results = trainer.validate(val_data.get_loader())
+        logging.info(val_results)   
+        save_results(filename, val_results, filename.split("/")[-1] )
+
+    elif args.adaquant:
         def Qhook(name,module, input, output):
             if module not in cached_qinput:
                 cached_qinput[module] = []
