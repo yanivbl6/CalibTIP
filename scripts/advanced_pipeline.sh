@@ -1,4 +1,4 @@
-sh scripts/adaquant.sh resnet resnet50 4 4 True
+sh scripts/adaquant.sh resnet resnet50 8 8 Truesh scripts/adaquant.sh resnet resnet50 4 4 True
 sh scripts/adaquant.sh resnet resnet50 8 8 True
 sh scripts/integer-programing.sh resnet resnet50 4 4 8 8 50 loss True
 

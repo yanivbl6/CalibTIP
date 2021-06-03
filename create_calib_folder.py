@@ -2,8 +2,8 @@
 import os
 import shutil
 
-basepath = '/home/Datasets/imagenet/train/'
-basepath_calib = '/home/Datasets/imagenet/calib/'
+basepath = '/imagenet/train/'
+basepath_calib = './imagenet/calib/'
 
 directory = os.fsencode(basepath)
 os.mkdir(basepath_calib)

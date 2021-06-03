@@ -99,7 +99,7 @@ def adaquant(layer, cached_inps, cached_outs, test_inp, test_out, lr1=1e-4, lr2=
     return mse_before.item(), mse_after.item()
 
 
-def optimize_layer(layer, in_out, optimize_weights=False, batch_size=100, model_name=None):
+def optimize_layer(layer, in_out, optimize_weights=False, batch_size=100, model_name=None, progress = False):
 
     # if layer.name == 'features.17.conv.0.0' or layer.name == 'features.17.conv.1.0':
     #     dump("mobilenet_v2", layer, in_out)
@@ -128,9 +128,9 @@ def optimize_layer(layer, in_out, optimize_weights=False, batch_size=100, model_
             relu_condition = lambda layer_name: layer_name.endswith('0.0') or layer_name.endswith('0.1') or layer_name.endswith('18.0')
 
         if relu_condition(layer.name):
-            mse_before, mse_after = adaquant(layer, cached_inps, cached_outs, test_inp, test_out, iters=1000, lr1=1e-5, lr2=1e-4,relu=True)
+            mse_before, mse_after = adaquant(layer, cached_inps, cached_outs, test_inp, test_out, progress = progress, iters=1000, lr1=1e-5, lr2=1e-4,relu=True)
         else:
-            mse_before, mse_after = adaquant(layer, cached_inps, cached_outs, test_inp, test_out, iters=1000, lr1=1e-5, lr2=1e-4)
+            mse_before, mse_after = adaquant(layer, cached_inps, cached_outs, test_inp, test_out, progress = progress, iters=1000, lr1=1e-5, lr2=1e-4)
         mse_before_opt = mse_before
         print("MSE before adaquant: {}".format(mse_before))
         print("MSE after adaquant: {}".format(mse_after))

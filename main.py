@@ -38,6 +38,9 @@ import ast
 import ntpath
 from functools import partial
 
+import pickle
+import pathlib
+
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
                      and callable(models.__dict__[name]))
@@ -190,10 +193,28 @@ parser.add_argument('--precisions', type=str, default='4;8',
 parser.add_argument('--tuning-iter', default=1, type=int, help='Number of iterations to tune batch normalization layers.')
 parser.add_argument('--res-log', default=None, help='path to result pandas log file')
 parser.add_argument('--cmp', type=str, help='compression_ratio')
+parser.add_argument('--validate', action='store_true', default=False,
+                    help='Run validation on model from checkpoint')
 
 def main():
     args = parser.parse_args()
     main_worker(args)
+
+def save_results(path, new_res, key):
+
+    directory = pathlib.Path(path).parent.absolute()
+    try:
+        with open(f'{directory}/results.pkl', 'rb') as handle:
+            all_results = pickle.load(handle)
+    except:
+        all_results = {}
+    
+    all_results[key] = new_res
+
+    with open(f'{directory}/results.pkl', 'wb') as handle:
+        pickle.dump(all_results, handle)
+        
+
 
 def main_with_args(**kwargs):
     args = parser.parse_known_args()[0]
@@ -203,6 +224,7 @@ def main_with_args(**kwargs):
     acc, loss = main_worker(args)
     return acc, loss
     
+
 def main_worker(args):
     global best_prec1, dtype
     acc = -1
@@ -424,7 +446,14 @@ def main_worker(args):
     cached_input_output = {}
     quant_keys = ['.weight', '.bias', '.equ_scale', '.quantize_input.running_zero_point', '.quantize_input.running_range',
          '.quantize_weight.running_zero_point', '.quantize_weight.running_range','.quantize_input1.running_zero_point', '.quantize_input1.running_range'
-         '.quantize_input2.running_zero_point', '.quantize_input2.running_range']        
+         '.quantize_input2.running_zero_point', '.quantize_input2.running_range']   
+
+    if args.validate:
+        val_results = trainer.validate(val_data.get_loader())
+        logging.info(val_results)   
+        save_results(args.evaluate, val_results, args.evaluate.split("/")[-1] )
+
+
     if args.adaquant:
         def Qhook(name,module, input, output):
             if module not in cached_qinput:
@@ -466,7 +495,7 @@ def main_worker(args):
 
         mse_df = pd.DataFrame(index=np.arange(len(cached_input_output)), columns=['name', 'bit', 'shape', 'mse_before', 'mse_after'])
         print_freq = 100
-        for i, layer in enumerate(cached_input_output):
+        for i, layer in tqdm(enumerate(cached_input_output)):
             if i>0 and args.seq_adaquant:
                 count = 0
                 cached_qinput = {}
@@ -482,7 +511,7 @@ def main_worker(args):
                 handler.remove()            
             print("\nOptimize {}:{} for {} bit of shape {}".format(i, layer.name, layer.num_bits, layer.weight.shape))
             mse_before, mse_after, snr_before, snr_after, kurt_in, kurt_w = \
-                optimize_layer(layer, cached_input_output[layer], args.optimize_weights, batch_size=args.batch_size, model_name=args.model)
+                optimize_layer(layer, cached_input_output[layer], args.optimize_weights, progress= False, batch_size=args.batch_size, model_name=args.model)
             print("\nMSE before optimization: {}".format(mse_before))
             print("MSE after optimization:  {}".format(mse_after))
             mse_df.loc[i, 'name'] = layer.name
@@ -499,12 +528,28 @@ def main_worker(args):
         mse_df.to_csv(mse_csv)
 
         filename = args.evaluate + '.adaquant'
+
+        if 'quant_block' in model_config and isinstance(model_config['quant_block'],list):
+
+            if 'bits_pattern' in model_config and not model_config['bits_pattern'] is None:
+                pattern = model_config['bits_pattern']
+                desc = format(pattern, '#010b') if pattern > 0 else format(pattern+256, '#010b')
+            else:
+                desc = "block"
+
+            for c in model_config['quant_block']:
+                desc = desc + f"_{c}"
+
+            filename = filename + desc
+
         torch.save(model.state_dict(), filename)
 
         train_data = None
         cached_input_output = None
         val_results = trainer.validate(val_data.get_loader())
         logging.info(val_results)
+
+        save_results(args.evaluate, val_results, args.evaluate.split("/")[-1] )
 
         if args.res_log is not None:
             if not os.path.exists(args.res_log):

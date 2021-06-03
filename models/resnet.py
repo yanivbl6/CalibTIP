@@ -23,10 +23,10 @@ def depBatchNorm2d(exists, *kargs, **kwargs):
         return Lambda()
 
 
-def conv3x3(in_planes, out_planes, stride=1, groups=1, bias=False,num_bits=8,num_bits_weight=8,measure=False, cal_qparams=False):
+def conv3x3(in_planes, out_planes, stride=1, groups=1, bias=False,num_bits=8,num_bits_weight=8,measure=False, cal_qparams=False, quant_block = None, bits_pattern = 0):
     "3x3 convolution with padding"
     return QConv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=1, groups=groups, bias=bias,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams)
+                     padding=1, groups=groups, bias=bias,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams, quant_block = quant_block, bits_pattern = bits_pattern)
 
 
 def init_model(model):
@@ -49,12 +49,12 @@ def init_model(model):
 
 class BasicBlock(nn.Module):
 
-    def __init__(self, inplanes, planes,  stride=1, expansion=1, downsample=None, groups=1, residual_block=None,batch_norm=True,measure=False,num_bits=8,num_bits_weight=8, cal_qparams=False):
+    def __init__(self, inplanes, planes,  stride=1, expansion=1, downsample=None, groups=1, residual_block=None,batch_norm=True,measure=False,num_bits=8,num_bits_weight=8, cal_qparams=False, quant_block = None, bits_pattern = 0):
         super(BasicBlock, self).__init__()
-        self.conv1 = conv3x3(inplanes, planes, stride, groups=groups,bias=not batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams)
+        self.conv1 = conv3x3(inplanes, planes, stride, groups=groups,bias=not batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams, quant_block = quant_block, bits_pattern = bits_pattern)
         self.bn1 = depBatchNorm2d(batch_norm,planes)
         self.relu1 = nn.ReLU(inplace=False)
-        self.conv2 = conv3x3(planes, expansion * planes, groups=groups,bias=not batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams)
+        self.conv2 = conv3x3(planes, expansion * planes, groups=groups,bias=not batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams, quant_block = quant_block, bits_pattern = bits_pattern)
         self.bn2 = depBatchNorm2d(batch_norm, expansion * planes)
         self.relu2 = nn.ReLU(inplace=False)
         self.downsample = downsample
@@ -83,15 +83,15 @@ class BasicBlock(nn.Module):
 
 class Bottleneck(nn.Module):
 
-    def __init__(self, inplanes, planes,  stride=1, expansion=4, downsample=None, groups=1, residual_block=None,batch_norm=True,measure=False,num_bits=8,num_bits_weight=8, cal_qparams=False):
+    def __init__(self, inplanes, planes,  stride=1, expansion=4, downsample=None, groups=1, residual_block=None,batch_norm=True,measure=False,num_bits=8,num_bits_weight=8, cal_qparams=False, quant_block = None, bits_pattern = 0):
         super(Bottleneck, self).__init__()
         self.conv1 = QConv2d(
-            inplanes, planes, kernel_size=1, bias=not batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams)
+            inplanes, planes, kernel_size=1, bias=not batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams, quant_block = quant_block, bits_pattern = bits_pattern)
         self.bn1 = depBatchNorm2d(batch_norm, planes)
-        self.conv2 = conv3x3(planes, planes, stride=stride, groups=groups,bias=not batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams)
+        self.conv2 = conv3x3(planes, planes, stride=stride, groups=groups,bias=not batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams, quant_block = quant_block, bits_pattern = bits_pattern)
         self.bn2 = depBatchNorm2d(batch_norm, planes)
         self.conv3 = QConv2d(
-            planes, planes * expansion, kernel_size=1, bias=not batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams)
+            planes, planes * expansion, kernel_size=1, bias=not batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams, quant_block = quant_block, bits_pattern = bits_pattern)
         self.bn3 = depBatchNorm2d(batch_norm, planes * expansion)
         self.relu1 = nn.ReLU(inplace=False)
         self.relu2 = nn.ReLU(inplace=False)
@@ -130,13 +130,13 @@ class ResNet(nn.Module):
     def __init__(self):
         super(ResNet, self).__init__()
 
-    def _make_layer(self, block, planes, blocks, expansion=1, stride=1, groups=1, residual_block=None, batch_norm=True, num_bits=8, num_bits_weight=8, perC=True,measure=False, cal_qparams=False):
+    def _make_layer(self, block, planes, blocks, expansion=1, stride=1, groups=1, residual_block=None, batch_norm=True, num_bits=8, num_bits_weight=8, perC=True,measure=False, cal_qparams=False, quant_block = None, bits_pattern = 0):
         downsample = None
         out_planes = planes * expansion
         if stride != 1 or self.inplanes != out_planes:
             downsample = nn.Sequential(
                 QConv2d(self.inplanes, out_planes,
-                          kernel_size=1, stride=stride, bias=not batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams),
+                          kernel_size=1, stride=stride, bias=not batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams, quant_block = quant_block, bits_pattern = bits_pattern),
                 depBatchNorm2d(batch_norm,planes * expansion),
             )
         if residual_block is not None:
@@ -144,11 +144,11 @@ class ResNet(nn.Module):
 
         layers = []
         layers.append(block(self.inplanes, planes, stride, expansion=expansion,
-                            downsample=downsample, groups=groups, residual_block=residual_block,batch_norm=batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams))
+                            downsample=downsample, groups=groups, residual_block=residual_block,batch_norm=batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams, quant_block = quant_block, bits_pattern = bits_pattern))
         self.inplanes = planes * expansion
         for i in range(1, blocks):
             layers.append(block(self.inplanes, planes, expansion=expansion, groups=groups,
-                                residual_block=residual_block,batch_norm=batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams))
+                                residual_block=residual_block,batch_norm=batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,measure=measure, cal_qparams=cal_qparams, quant_block = quant_block, bits_pattern = bits_pattern))
 
         return nn.Sequential(*layers)
 
@@ -186,11 +186,11 @@ class ResNet_imagenet(ResNet):
     def __init__(self, num_classes=1000, inplanes=64,
                  block=Bottleneck, residual_block=None, layers=[3, 4, 23, 3],
                  width=[64, 128, 256, 512], expansion=4, groups=[1, 1, 1, 1],
-                 regime='normal', scale_lr=1,batch_norm=True,num_bits=8,num_bits_weight=8, perC=True, measure=False, cal_qparams=False):
+                 regime='normal', scale_lr=1,batch_norm=True,num_bits=8,num_bits_weight=8, perC=True, measure=False, cal_qparams=False, quant_block = None, bits_pattern = 0):
         super(ResNet_imagenet, self).__init__()
         self.inplanes = inplanes
         self.conv1 = QConv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
-                               bias=not batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight, perC=perC ,measure=measure, cal_qparams=cal_qparams)
+                               bias=not batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight, perC=perC ,measure=measure, cal_qparams=cal_qparams, quant_block = None)
         self.bn1 = depBatchNorm2d(batch_norm,self.inplanes)
         self.relu = nn.ReLU(inplace=False)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -201,10 +201,10 @@ class ResNet_imagenet(ResNet):
             #    num_bits_weight = 4
             setattr(self, 'layer%s' % str(i + 1),
                     self._make_layer(block=block, planes=width[i], blocks=layers[i], expansion=expansion,
-                                     stride=1 if i == 0 else 2, residual_block=residual_block, groups=groups[i],batch_norm=batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,perC=perC, measure=measure, cal_qparams=cal_qparams))
+                                     stride=1 if i == 0 else 2, residual_block=residual_block, groups=groups[i],batch_norm=batch_norm,num_bits=num_bits,num_bits_weight=num_bits_weight,perC=perC, measure=measure, cal_qparams=cal_qparams, quant_block = quant_block, bits_pattern = bits_pattern))
 
         self.avgpool = nn.AdaptiveAvgPool2d(1)
-        self.fc = QLinear(width[-1] * expansion, num_classes,num_bits_weight=num_bits_weight,perC=perC,measure=measure, cal_qparams=cal_qparams)
+        self.fc = QLinear(width[-1] * expansion, num_classes,num_bits_weight=num_bits_weight,perC=perC,measure=measure, cal_qparams=cal_qparams, quant_block = quant_block, bits_pattern = bits_pattern)
         if batch_norm:
             init_model(self)
 
@@ -258,7 +258,7 @@ class ResNet_cifar(ResNet):
 
     def __init__(self, num_classes=10, inplanes=16,
                  block=BasicBlock, depth=18, width=[16, 32, 64],
-                 groups=[1, 1, 1], residual_block=None,batch_norm=True, num_bits=8, num_bits_weight=8, perC=True, measure=False, cal_qparams=False):
+                 groups=[1, 1, 1], residual_block=None,batch_norm=True, num_bits=8, num_bits_weight=8, perC=True, measure=False, cal_qparams=False, quant_block = None, bits_pattern = 0):
         super(ResNet_cifar, self).__init__()
         #inplanes=4
         #width=[4, 8, 16]
@@ -270,11 +270,11 @@ class ResNet_cifar(ResNet):
         self.relu = nn.ReLU(inplace=False)
         self.maxpool = lambda x: x
         self.layer1 = self._make_layer(block, width[0], n, groups=groups[
-                                       0], residual_block=residual_block,batch_norm=batch_norm, num_bits=num_bits,num_bits_weight=num_bits_weight,perC=perC, measure=measure,  cal_qparams=cal_qparams)
+                                       0], residual_block=residual_block,batch_norm=batch_norm, num_bits=num_bits,num_bits_weight=num_bits_weight,perC=perC, measure=measure,  cal_qparams=cal_qparams, quant_block = quant_block, bits_pattern = bits_pattern)
         self.layer2 = self._make_layer(
-            block, width[1], n, stride=2, groups=groups[1], residual_block=residual_block,batch_norm=batch_norm, num_bits=num_bits,num_bits_weight=num_bits_weight,perC=perC, measure=measure, cal_qparams=cal_qparams)
+            block, width[1], n, stride=2, groups=groups[1], residual_block=residual_block,batch_norm=batch_norm, num_bits=num_bits,num_bits_weight=num_bits_weight,perC=perC, measure=measure, cal_qparams=cal_qparams, quant_block = quant_block, bits_pattern = bits_pattern)
         self.layer3 = self._make_layer(
-            block, width[2], n, stride=2, groups=groups[2], residual_block=residual_block,batch_norm=batch_norm, num_bits=num_bits,num_bits_weight=num_bits_weight,perC=perC, measure=measure, cal_qparams=cal_qparams)
+            block, width[2], n, stride=2, groups=groups[2], residual_block=residual_block,batch_norm=batch_norm, num_bits=num_bits,num_bits_weight=num_bits_weight,perC=perC, measure=measure, cal_qparams=cal_qparams, quant_block = quant_block, bits_pattern = bits_pattern)
         self.layer4 = lambda x: x
         self.avgpool = nn.AvgPool2d(8)
         self.fc = nn.Linear(width[-1], num_classes)
