@@ -103,6 +103,61 @@ def block_quant(weight, block, num_bits, second_sort , M, N, decay = 0.0002, lsb
 
     return w_out
 
+def block_quant2(weight, block, num_bits, second_sort , M, N, decay = 0.0002, lsb = True):
+    mod_factor = int(2**(num_bits - second_sort))
+    length = weight.numel()
+    group = int(length/M)
+
+    ##import pdb; pdb.set_trace()
+
+
+    if lsb == 0:
+        weight_temp = weight.detach().abs().permute(0,2,3,1).reshape(group, M)
+        index = torch.argsort(-(weight_temp % mod_factor) , dim=1)
+    elif (lsb == 1):
+        weight_temp = weight.detach().abs().permute(0,2,3,1).reshape(group, M)
+        index = torch.argsort(-(weight_temp) , dim=1)
+    else:
+        weight_temp = weight.detach().permute(0,2,3,1).reshape(group, M)
+        index = torch.argsort(-(weight_temp.bitwise_and(~lsb)) , dim=1)
+    
+    index_pool = torch.zeros(weight_temp.shape, device=weight_temp.device, dtype = torch.int8)
+    
+    w_out = 0
+    i = 0
+    
+
+    block.keys
+
+    bits = num_bits
+    count = block[bits]
+
+    block[0] = block[0] + count
+
+    P_indexes= index[:, i:i+count]
+    w_p = index_pool.scatter_(dim=1, index=P_indexes, value=1).reshape(weight.permute(0,2,3,1).shape)
+    w_p = w_p.permute(0,3,1,2)
+
+    if (lsb==0):
+        reduceFactor = int(2**(num_bits-bits))
+        tmp =  (weight*w_p // reduceFactor) * reduceFactor
+    elif (lsb == 1):
+        minval = -int(2**(bits-1))
+        maxval = minval + int(2**(bits)) -1
+        tmp =  (weight*w_p).clamp(minval,maxval)
+    else:
+        if bits == num_bits:
+            tmp =  weight*w_p
+        else:
+            tmp =  (weight*w_p).bitwise_and(lsb)
+
+
+    w_out = w_out + tmp
+
+    i = i + count
+
+    return w_out
+
 class Sparse_NHWC(autograd.Function):
     """" Prune the unimprotant edges for the forwards phase but pass the gradient to dense weight using STE in the backwards phase"""
 
@@ -122,10 +177,9 @@ class Sparse_NHWC(autograd.Function):
             weight_temp = weight.detach().abs().permute(0,2,3,1).reshape(group, M)
 
             index = torch.argsort(weight_temp, dim=1)[:, :N]
-
             F_indexes= index[:, :N]
 
-            w_f = torch.ones(weight_temp.shape, device=weight_temp.device)
+            w_f = torch.ones(weight_temp.shape, device=weight_temp.device, dtype= torch.int8)
             w_f = w_f.scatter_(dim=1, index=F_indexes, value=0).reshape(weight.permute(0,2,3,1).shape)
             w_f = w_f.permute(0,3,1,2)
 

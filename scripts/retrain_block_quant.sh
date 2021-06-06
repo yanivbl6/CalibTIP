@@ -37,7 +37,7 @@ while [ "$#" -gt 0 ]; do
         block="None"
     fi
     ##python main.py --optimize-weights  --device-ids $cuda_device --nbits_weight $nbits_weight --nbits_act $nbits_act  --num-sp-layers $num_sp_layers  --model $model -b 64 --evaluate results/$workdir/$model.absorb_bn.measure$perC_suffix --model-config "{'batch_norm': False,'measure': False, 'perC': $perC, 'quant_block': $block, 'bits_pattern': $pattern}" --dataset imagenet_calib --datasets-dir $datasets_dir --fine-tune
-    echo "python main.py --optimize-weights  --device-ids $cuda_device --nbits_weight $nbits_weight --nbits_act $nbits_act  --num-sp-layers $num_sp_layers  --model $model -b 64 --evaluate results/$workdir/$model.absorb_bn.measure$perC_suffix --model-config \"{'batch_norm': False,'measure': False, 'perC': $perC, 'quant_block': $block, 'bits_pattern': $pattern}\" --dataset imagenet --datasets-dir $datasets_dir --fine-tune"
+    echo "python main.py --optimize-weights  --device-ids $cuda_device --nbits_weight $nbits_weight --nbits_act $nbits_act  --num-sp-layers $num_sp_layers  --model $model -b 64 --evaluate results/$workdir/$model.absorb_bn.measure$perC_suffix --model-config \"{'batch_norm': False,'measure': False, 'perC': $perC, 'quant_block': $block, 'bits_pattern': $pattern}\" --dataset imagenet --datasets-dir $datasets_dir --fine-tune --print_freq 100"
     shift 2
 done
 

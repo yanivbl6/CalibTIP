@@ -281,7 +281,7 @@ def main_worker(args):
     dataset_type = 'imagenet' if args.dataset =='imagenet_calib' else args.dataset
     model_config = {'dataset': dataset_type}
 
-    if args.model_config is not '':
+    if not args.model_config == '':
         if isinstance(args.model_config, dict):
             for k, v in args.model_config.items():
                 if k not in model_config.keys():
@@ -402,11 +402,26 @@ def main_worker(args):
                 {'epoch': 10, 'lr': 1e-6, 'momentum': 0.9}]
             epochs = 15
 
+
         optim_regime = [
-            {'epoch': 0, 'optimizer': 'SGD', 'lr': 1e-5, 'momentum': 0.9},
-            {'epoch': 2, 'lr': 5e-6, 'momentum': 0.9},
-            {'epoch': 10, 'lr': 1e-6, 'momentum': 0.9}]
-    
+            {'epoch': 0, 'optimizer': 'SGD', 'lr': 7e-6, 'momentum': 0.9},
+            {'epoch': 1, 'lr': 5e-6, 'momentum': 0.9},
+            {'epoch': 2, 'lr': 3e-6, 'momentum': 0.9},
+            {'epoch': 4, 'lr': 1e-6, 'momentum': 0.9},
+            {'epoch': 6, 'lr': 7e-7, 'momentum': 0.9}]
+
+        optim_regime = [
+            {'epoch': 0, 'optimizer': 'SGD', 'lr': 4e-6, 'momentum': 0.9},
+            {'epoch': 1, 'lr': 3e-6, 'momentum': 0.9},
+            {'epoch': 2, 'lr': 2e-6, 'momentum': 0.9},
+            {'epoch': 3, 'lr': 1e-6, 'momentum': 0.9},
+            {'epoch': 4, 'lr': 9e-7, 'momentum': 0.9},
+            {'epoch': 5, 'lr': 8e-7, 'momentum': 0.9},
+            {'epoch': 6, 'lr': 7e-7, 'momentum': 0.9}]
+
+        epochs = 7
+
+
     optimizer = optim_regime if isinstance(optim_regime, OptimRegime) \
         else OptimRegime(model, optim_regime, use_float_copy='half' in args.dtype)
 
@@ -465,15 +480,33 @@ def main_worker(args):
 
     if args.fine_tune:
         
+        if 'quant_block' in model_config and isinstance(model_config['quant_block'],list):
+
+            if 'bits_pattern' in model_config and not model_config['bits_pattern'] is None:
+                pattern = model_config['bits_pattern']
+                desc = format(pattern, '#010b') if pattern > 0 else format(pattern+256, '#010b')
+            else:
+                desc = "_block"
+
+            for c in model_config['quant_block']:
+                desc = desc + f"_{c}"
+
+        else:
+            desc = ""
+
+        filename = args.evaluate + desc + '.finetune'
+        best = 0.0
         for epoch in range(epochs):
             trainer.train(train_data.get_loader())
+            trainer.epoch = trainer.epoch + 1 
+            val_results = trainer.validate(val_data.get_loader())
+            logging.info(val_results)
+            prec1=val_results['prec1']
+            if prec1> best:
+                torch.save(model.state_dict(), filename)
+                best = prec1
+                save_results(filename, val_results, filename.split("/")[-1] )
 
-        filename = args.evaluate + '.finetune'
-        torch.save(model.state_dict(), filename)
-
-        val_results = trainer.validate(val_data.get_loader())
-        logging.info(val_results)   
-        save_results(filename, val_results, filename.split("/")[-1] )
 
     elif args.adaquant:
         def Qhook(name,module, input, output):
